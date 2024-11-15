@@ -1,0 +1,13 @@
+[project]
+name = "diun2homer"
+version = "0.1.0"
+description = "FastAPI proxy receiving Diun webhooks and making them available to Homer"
+authors = [
+    {name = "Robert Spencer", email = "rj@game.net.au"}
+]
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
