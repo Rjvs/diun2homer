@@ -9,16 +9,16 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean && \
     rm -rf /var/cache/apt/* && \
-    pip install --upgrade pip && \
-    pip install --upgrade uv
+    pip install --no-cache-dir --no-warn-script-location --root-user-action=ignore \
+        --upgrade pip uv
 
-# Copy dependency files
-COPY pyproject.toml ./
+# Copy all project files needed for installation
+COPY pyproject.toml diun2homer.py ./
 
 # Create virtual environment and install dependencies
 RUN python -m venv .venv && \
     . .venv/bin/activate && \
-    uv pip install -e .
+    uv pip install .
 
 # Final stage
 FROM python:3.11-slim
