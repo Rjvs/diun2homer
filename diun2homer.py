@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from typing import List, Optional
@@ -9,19 +10,28 @@ import os
 import traceback
 import sys
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting diun2homer")
+    init_db()
+    yield
+    # Shutdown (if needed)
+    logger.info("Shutting down diun2homer")
+
+app = FastAPI(lifespan=lifespan)
 
 # Configure logging based on DEBUG environment variable
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 logging.basicConfig(
     level=logging.DEBUG if DEBUG else logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('diun2homer.log')
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
+        + ([logging.FileHandler('/app/data/debug.log')] if DEBUG else [])
 )
 logger = logging.getLogger('diun2homer')
+if DEBUG:
+    logger.info("Debug logging is enabled")
 
 # Add this near the top of the file, after imports
 DATABASE_NAME = 'diun2homer.db'
@@ -128,17 +138,21 @@ def get_homer_messages() -> List[dict]:
         logger.debug(f"Detailed error: {traceback.format_exc()}")
         raise
 
-# Initialize database on startup
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting diun2homer")
-    init_db()
-
 # Diun webhook endpoint
-@app.post("/diun")
-async def diun(payload: DiunPayload, request: Request):
+@app.api_route("/diun", methods=["GET", "POST"])
+async def diun(request: Request):
     try:
         client_host = request.client.host
+        
+        # Handle both GET and POST methods
+        if request.method == "GET":
+            # For GET requests, create payload from query parameters
+            query_params = dict(request.query_params)
+            payload = DiunPayload(**query_params)
+        else:
+            # For POST requests, parse JSON body
+            payload = DiunPayload(**(await request.json()))
+            
         logger.info(f"Received webhook from {client_host} for image: {payload.image}")
         if DEBUG:
             logger.debug(f"Request headers: {dict(request.headers)}")
